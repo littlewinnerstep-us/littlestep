@@ -19,6 +19,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate neural voice clips
+        working-directory: .
+        run: |
+          pip install --quiet edge-tts
+          python3 voice-tools/make_voices.py
       - name: Copy web assets into Android
         working-directory: .
         run: |

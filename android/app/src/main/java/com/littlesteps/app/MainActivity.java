@@ -78,19 +78,16 @@ public class MainActivity extends Activity {
             tts.speak(text, TextToSpeech.QUEUE_FLUSH, null, "ls");
         }
 
-        /** Same as speak, with the game's voice style (lively, slow and gentle after mistakes, calm). */
+        /** Same as speak, with natural rate and gentle pitch (avoids robotic pitch-bouncing). */
         @JavascriptInterface
         public void speakWith(String text, double rate, double pitch) {
             if (!ttsReady || text == null) return;
-            // Speak sentence by sentence with a little pitch movement so it sounds less flat.
-            String[] parts = text.split("(?<=[.!?])\\s+");
-            tts.setSpeechRate((float) rate);
-            for (int i = 0; i < parts.length; i++) {
-                if (parts[i].trim().isEmpty()) continue;
-                float p = (float) pitch + (i % 2 == 0 ? 0.07f : -0.05f) + (parts[i].endsWith("!") ? 0.06f : 0f);
-                tts.setPitch(Math.max(0.6f, Math.min(1.6f, p)));
-                tts.speak(parts[i].trim(), i == 0 ? TextToSpeech.QUEUE_FLUSH : TextToSpeech.QUEUE_ADD, null, "ls" + i);
-            }
+            float r = Math.max(0.72f, Math.min(1.15f, (float) rate));
+            // Keep pitch close to 1.0 so neural/natural voices keep their human warmth.
+            float p = Math.max(0.94f, Math.min(1.08f, 1.0f + ((float) pitch - 1.0f) * 0.35f));
+            tts.setSpeechRate(r);
+            tts.setPitch(p);
+            tts.speak(text.trim(), TextToSpeech.QUEUE_FLUSH, null, "ls");
         }
 
         /** "ok", "nolang" (no voice installed for that language) or "none" (no speech engine). */
@@ -114,13 +111,34 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** Picks the highest-quality installed voice for the language (Google "network" voices sound the most natural). */
+    /** Picks the highest-quality installed voice for the language, preferring natural/neural voices. */
     private void pickBestVoice(Locale loc) {
         try {
+            java.util.Set<android.speech.tts.Voice> voices = tts.getVoices();
+            if (voices == null) return;
             android.speech.tts.Voice best = null;
-            for (android.speech.tts.Voice v : tts.getVoices()) {
-                if (!v.getLocale().getLanguage().equals(loc.getLanguage())) continue;
-                if (best == null || v.getQuality() > best.getQuality()) best = v;
+            int bestScore = Integer.MIN_VALUE;
+            for (android.speech.tts.Voice v : voices) {
+                if (v.getLocale() == null || !v.getLocale().getLanguage().equals(loc.getLanguage())) continue;
+                int score = 0;
+                if (loc.getCountry().equalsIgnoreCase(v.getLocale().getCountry())) score += 30;
+                int q = v.getQuality();
+                if (q >= android.speech.tts.Voice.QUALITY_VERY_HIGH) score += 50;
+                else if (q >= android.speech.tts.Voice.QUALITY_HIGH) score += 35;
+                else if (q >= android.speech.tts.Voice.QUALITY_NORMAL) score += 15;
+                String name = v.getName() != null ? v.getName().toLowerCase(Locale.US) : "";
+                if (name.contains("neural") || name.contains("natural") || name.contains("wavenet")
+                        || name.contains("studio") || name.contains("network") || name.contains("google")) {
+                    score += 20;
+                }
+                if (name.contains("espeak") || name.contains("compact") || name.contains("pico")) {
+                    score -= 40;
+                }
+                if (!v.isNetworkConnectionRequired()) score += 5;
+                if (best == null || score > bestScore) {
+                    best = v;
+                    bestScore = score;
+                }
             }
             if (best != null) tts.setVoice(best);
         } catch (Exception ignored) { }
@@ -133,8 +151,8 @@ public class MainActivity extends Activity {
             tts.setLanguage(Locale.getDefault());
         }
         pickBestVoice(loc);
-        tts.setSpeechRate(0.9f);
-        tts.setPitch(1.05f);
+        tts.setSpeechRate(0.94f);
+        tts.setPitch(1.0f);
     }
 
     @Override
