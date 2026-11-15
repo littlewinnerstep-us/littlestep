@@ -319,7 +319,7 @@ function voiceState(){ // 'ok' | 'none' (no speech engine) | 'nolang' (engine ha
   const c=lg()?'id':'en';return vs.some(x=>x.lang&&x.lang.toLowerCase().replace('_','-').indexOf(c)===0)?'ok':'nolang'}
 function voiceMsg(st){return st==='none'?X('This device has no speech voice. Open the game in Chrome, or install a text-to-speech voice.','Perangkat ini tidak punya suara bicara. Buka game di Chrome, atau pasang suara text-to-speech.')
   :X('No voice for this language is installed. Install it in Android Settings > Text-to-speech.','Suara untuk bahasa ini belum terpasang. Pasang di Pengaturan Android > Text-to-speech.')}
-function speak(t,style,force){if(!S.settings.voice||!t)return;const v=VSTYLE[style]||VSTYLE.say;let rate=v[0],pitch=v[1];
+function speak(t,style,force){if(!S.settings.voice||!t)return;hush();const v=VSTYLE[style]||VSTYLE.say;let rate=v[0],pitch=v[1];
   if(S.settings.voiceStyle==='calm'){rate*=.93;pitch=1+(pitch-1)*.35}
   if(playClip(t))return;
   duck(String(t).length*.07/rate+.6);
@@ -371,7 +371,7 @@ function moodNow(){if(CUR==='break'||CUR==='breakover')return'evening';if(CUR===
 function updateMusic(){if(S.settings.music!=='off'&&MUSIC_SCREENS[CUR]&&!document.hidden&&!PAUSED)musicStart(moodNow());else musicStop()}
 window.appPause=()=>{PAUSED=true;save();hush();musicStop();try{if(AC)AC.suspend()}catch(e){}};
 window.appResume=()=>{PAUSED=false;try{if(AC)AC.resume()}catch(e){}updateMusic()};
-function hush(){try{if(CLIPAUD)CLIPAUD.pause();if(window.AndroidTTS&&AndroidTTS.stop)AndroidTTS.stop();else if('speechSynthesis' in window)speechSynthesis.cancel()}catch(e){}}
+function hush(){try{if(CLIPAUD){CLIPAUD.pause();CLIPAUD.currentTime=0}if(window.AndroidTTS&&AndroidTTS.stop)AndroidTTS.stop();if('speechSynthesis' in window)speechSynthesis.cancel()}catch(e){}}
 
 /* ---------- content: every word has English + Indonesian ---------- */
 /* items are [emoji, English, Indonesian] */
