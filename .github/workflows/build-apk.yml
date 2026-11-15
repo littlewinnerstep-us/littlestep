@@ -19,6 +19,12 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Copy web assets into Android
+        working-directory: .
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp web/index.html android/app/src/main/assets/
+          if [ -d web/voice ]; then cp -r web/voice android/app/src/main/assets/; fi
       - name: Build debug APK
         run: gradle assembleDebug
       - uses: actions/upload-artifact@v4
