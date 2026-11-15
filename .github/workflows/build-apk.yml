@@ -25,8 +25,42 @@ jobs:
       - name: Generate neural voice clips
         working-directory: .
         run: |
-          pip install --quiet edge-tts
+          pip install --quiet edge-tts pillow
           python3 voice-tools/make_voices.py
+      - name: Clean app icon background
+        working-directory: .
+        run: |
+          python3 -c '
+          from PIL import Image
+          import os
+          src = "android/app/src/main/res/drawable-nodpi/ic_launcher.jpg"
+          dst = "android/app/src/main/res/drawable-nodpi/ic_launcher.png"
+          if os.path.exists(src):
+              im = Image.open(src).convert("RGBA")
+              w, h = im.size
+              px = im.load()
+              bg = px[0, 0][:3]
+              visited = bytearray(w * h)
+              stack = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)]
+              for x, y in stack:
+                  visited[y * w + x] = 1
+              while stack:
+                  x, y = stack.pop()
+                  r, g, b, _ = px[x, y]
+                  if abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) < 75:
+                      px[x, y] = (0, 0, 0, 0)
+                      for nx, ny in ((x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)):
+                          if 0 <= nx < w and 0 <= ny < h and not visited[ny * w + nx]:
+                              visited[ny * w + nx] = 1
+                              stack.append((nx, ny))
+              bbox = im.getbbox()
+              if bbox:
+                  im = im.crop(bbox)
+              im = im.resize((512, 512), Image.LANCZOS)
+              im.save(dst, "PNG")
+              os.remove(src)
+              print("Saved clean transparent icon:", dst)
+          '
       - name: Copy web assets into Android
         working-directory: .
         run: |
