@@ -2,6 +2,8 @@ package com.littlesteps.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.speech.tts.TextToSpeech;
@@ -12,6 +14,16 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.Locale;
 
 public class MainActivity extends Activity {
@@ -67,7 +79,13 @@ public class MainActivity extends Activity {
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.addJavascriptInterface(new Bridge(), "AndroidTTS");
 
-        web.loadUrl("file:///android_asset/index.html");
+        File otaIndex = new File(new File(getFilesDir(), "web"), "index.html");
+        if (otaIndex.exists() && otaIndex.length() > 1000) {
+            web.loadUrl(Uri.fromFile(otaIndex).toString());
+        } else {
+            web.loadUrl("file:///android_asset/index.html");
+        }
+        checkAndUpdateWeb();
     }
 
     /** Called by the game: AndroidTTS.speak(text), AndroidTTS.stop(), AndroidTTS.setLang("en"|"id"). */
@@ -186,5 +204,119 @@ public class MainActivity extends Activity {
         }
         web.destroy();
         super.onDestroy();
+    }
+
+    private static final String OTA_BASE = "https://littlewinnerstep-us.github.io/littlestep/";
+
+    private void checkAndUpdateWeb() {
+        new Thread(() -> {
+            try {
+                String jsonStr = httpGetString(OTA_BASE + "version.json");
+                if (jsonStr == null) return;
+                JSONObject manifest = new JSONObject(jsonStr);
+                String remoteVer = manifest.optString("version", "");
+                JSONArray files = manifest.optJSONArray("files");
+                if (remoteVer.isEmpty() || files == null || files.length() == 0) return;
+
+                SharedPreferences prefs = getSharedPreferences("ls_ota", MODE_PRIVATE);
+                File webDir = new File(getFilesDir(), "web");
+                File localIndex = new File(webDir, "index.html");
+                if (remoteVer.equals(prefs.getString("web_version", "")) && localIndex.exists()) {
+                    return;
+                }
+
+                File tmpDir = new File(getFilesDir(), "web_tmp");
+                deleteRecursive(tmpDir);
+                if (!tmpDir.mkdirs() && !tmpDir.isDirectory()) return;
+
+                for (int i = 0; i < files.length(); i++) {
+                    String rel = files.getString(i);
+                    if (rel.contains("..") || rel.startsWith("/")) return;
+                    File dst = new File(tmpDir, rel);
+                    File parent = dst.getParentFile();
+                    if (parent != null && !parent.exists() && !parent.mkdirs()) return;
+                    if (!httpDownload(OTA_BASE + rel, dst)) {
+                        deleteRecursive(tmpDir);
+                        return;
+                    }
+                }
+
+                File tmpIndex = new File(tmpDir, "index.html");
+                if (!tmpIndex.exists() || tmpIndex.length() < 1000) {
+                    deleteRecursive(tmpDir);
+                    return;
+                }
+
+                File bakDir = new File(getFilesDir(), "web_bak");
+                deleteRecursive(bakDir);
+                if (webDir.exists()) webDir.renameTo(bakDir);
+                if (!tmpDir.renameTo(webDir)) {
+                    if (bakDir.exists()) bakDir.renameTo(webDir);
+                    deleteRecursive(tmpDir);
+                    return;
+                }
+                deleteRecursive(bakDir);
+                prefs.edit().putString("web_version", remoteVer).apply();
+
+                final String newUrl = Uri.fromFile(new File(webDir, "index.html")).toString();
+                runOnUiThread(() -> {
+                    if (web == null) return;
+                    web.evaluateJavascript(
+                        "if(typeof CUR!=='undefined'&&CUR==='home'){location.replace('" + newUrl + "');}"
+                        + "else if(window.toast){toast('Update ready — will apply next open');}",
+                        null
+                    );
+                });
+            } catch (Exception ignored) { }
+        }).start();
+    }
+
+    private static String httpGetString(String urlStr) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(8000);
+            if (conn.getResponseCode() != 200) return null;
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = br.readLine()) != null) sb.append(line).append('\n');
+            br.close();
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static boolean httpDownload(String urlStr, File dst) {
+        HttpURLConnection conn = null;
+        try {
+            conn = (HttpURLConnection) new URL(urlStr).openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(15000);
+            if (conn.getResponseCode() != 200) return false;
+            try (InputStream in = conn.getInputStream(); FileOutputStream out = new FileOutputStream(dst)) {
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+            }
+            return dst.length() > 0;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
+    }
+
+    private static void deleteRecursive(File f) {
+        if (f == null || !f.exists()) return;
+        File[] children = f.listFiles();
+        if (children != null) {
+            for (File c : children) deleteRecursive(c);
+        }
+        f.delete();
     }
 }
