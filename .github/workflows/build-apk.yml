@@ -61,6 +61,20 @@ jobs:
               os.remove(src)
               print("Saved clean transparent icon:", dst)
           '
+      - name: Stamp build version and time
+        working-directory: .
+        run: |
+          python3 -c '
+          import os, datetime
+          tz = datetime.timezone(datetime.timedelta(hours=7))
+          built = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M WIB")
+          ver = os.environ["GITHUB_SHA"][:7]
+          p = "web/index.html"
+          s = open(p, encoding="utf-8").read()
+          s = s.replace("const BUILD_INFO={ver:\x27local\x27,built:\x27dev\x27};", f"const BUILD_INFO={{ver:\x27{ver}\x27,built:\x27{built}\x27}};")
+          open(p, "w", encoding="utf-8").write(s)
+          print("Stamped:", ver, built)
+          '
       - name: Copy web assets into Android
         working-directory: .
         run: |

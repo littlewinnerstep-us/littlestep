@@ -211,6 +211,7 @@ body.ia-nogame #area .ea{animation:none!important}
 <script src="voice/clips.js" onerror="void 0"></script>
 <script>
 'use strict';
+const BUILD_INFO={ver:'local',built:'dev'};
 /* ========= Little Steps — 365 days, 3 sessions a day, adaptive levels, English / Bahasa Indonesia, custom colour (offline, single file) ========= */
 
 /* ---------- storage ---------- */
@@ -820,6 +821,7 @@ function renderParent(){enter('parent');const s=S.settings,p=S.profile,done=S.pr
   const recent=ds.slice(0,14).map(d=>`<tr><td>${d}</td><td>${done[d].date}</td><td>${done[d].parts}/3</td><td>${done[d].m}</td><td>${done[d].breaks}</td><td>${done[d].mins}</td></tr>`).join('')||`<tr><td colspan="6">${X('No finished days yet','Belum ada hari yang selesai')}</td></tr>`;
   const allSec=S.log.reduce((a,x)=>a+x.s,0);
   app.innerHTML=`${topBar(null)}<h1>${X('Grown-ups','Orang tua')}</h1>
+  <div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:8px;flex-wrap:wrap"><span>🧩 <b>${X('Version','Versi')}:</b> ${esc(BUILD_INFO.ver)}</span><span class="soft">🕒 ${X('Built','Dibuat')}: ${esc(BUILD_INFO.built)}</span></div>
   ${appearanceCard()}
   <div class="card sec"><h2>${X('Child','Anak')}</h2>
    <div class="row">${X('Name','Nama')}<input data-set="name" value="${esc(p.name)}" maxlength="20" style="width:55%"></div>
