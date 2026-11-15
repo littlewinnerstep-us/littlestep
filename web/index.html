@@ -661,7 +661,7 @@ function helpVoice(T){setTimeout(()=>{if(TASK!==T||T.fin)return;const now=Date.n
   const hand=!!document.querySelector('#area .hand');
   if(T.type==='memory')line=X('Keep going, you are doing great.','Terus ya, kamu hebat.');
   else if(hand&&!T.handSaid){T.handSaid=true;line=X("That's okay. Look where the hand points.",'Tidak apa-apa. Lihat yang ditunjuk tangan.')}
-  else if(T.m>=3&&T.m%2===1)line=X("Let's listen again. ",'Ayo dengarkan lagi. ')+T.say;
+  else if(T.m>=3&&T.m%2===1)line=hasClip(T.say)?T.say:X("Let's listen again. ",'Ayo dengarkan lagi. ')+T.say;
   else{const p=pick(Math.random,MISS);line=X(p[0],p[1])}
   lastHelp=now;speak(line,'help')},80)}
 function mountTask(o){const t=BUILD[o.type](rng(o.seed),o.lvl,o.th),m=META[o.type];
@@ -874,7 +874,7 @@ const ACT={
   home:renderHome,play:renderPlay,year:renderYear,stickers:renderStickers,gate:renderGate,
   say(){if(TASK)speak(TASK.say)},
   buddy(e){dance(e);sfx('star');burst(e);const h=new Date().getHours();
-    speak(X(`Good ${h<12?'morning':h<17?'afternoon':'evening'}, ${S.profile.name}!`,`Selamat ${h<11?'pagi':h<15?'siang':h<18?'sore':'malam'}, ${S.profile.name}!`))},
+    speak(X(`Good ${h<12?'morning':h<17?'afternoon':'evening'}!`,`Selamat ${h<11?'pagi':h<15?'siang':h<18?'sore':'malam'}!`))},
   part(e){const i=Number(e.dataset.v),s=S.session;if(s){if(s.part===i)return renderPlan();return toast(X('Finish your mission first 🙂','Selesaikan misimu dulu 🙂'))}
     newSession(S.progress.day,i,!!S.progress.cur.parts[i])},
   go:advance,
