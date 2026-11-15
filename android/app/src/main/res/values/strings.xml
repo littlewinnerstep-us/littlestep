@@ -1,0 +1,4 @@
+<resources>
+    <!-- The name shown under the app icon. Change it here. -->
+    <string name="app_name">Little Steps</string>
+</resources>
