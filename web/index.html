@@ -824,7 +824,7 @@ function renderParent(){enter('parent');const s=S.settings,p=S.profile,done=S.pr
   const recent=ds.slice(0,14).map(d=>`<tr><td>${d}</td><td>${done[d].date}</td><td>${done[d].parts}/3</td><td>${done[d].m}</td><td>${done[d].breaks}</td><td>${done[d].mins}</td></tr>`).join('')||`<tr><td colspan="6">${X('No finished days yet','Belum ada hari yang selesai')}</td></tr>`;
   const allSec=S.log.reduce((a,x)=>a+x.s,0);
   app.innerHTML=`${topBar(null)}<h1>${X('Grown-ups','Orang tua')}</h1>
-  <div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:8px;flex-wrap:wrap"><span>🧩 <b>${X('Version','Versi')}:</b> ${esc(BUILD_INFO.ver)}</span><span class="soft">🕒 ${X('Built','Dibuat')}: ${esc(BUILD_INFO.built)}</span></div>
+  <div class="card" style="padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;font-size:13px;gap:8px;flex-wrap:wrap"><span>🧩 <b>${X('Version','Versi')}:</b> ${esc(BUILD_INFO.ver)}</span><span class="soft">🕒 ${X('Built','Dibuat')}: ${esc(BUILD_INFO.built)}</span>${window.AndroidOTA?`<button class="btn sm" style="padding:4px 10px;min-height:32px;font-size:13px" data-a="checkOta">🔄 ${X('Check update','Cek update')}</button>`:''}</div>
   ${appearanceCard()}
   <div class="card sec"><h2>${X('Child','Anak')}</h2>
    <div class="row">${X('Name','Nama')}<input data-set="name" value="${esc(p.name)}" maxlength="20" style="width:55%"></div>
@@ -877,6 +877,7 @@ function renderParent(){enter('parent');const s=S.settings,p=S.profile,done=S.pr
 /* ---------- actions ---------- */
 const ACT={
   home:renderHome,play:renderPlay,year:renderYear,stickers:renderStickers,gate:renderGate,
+  checkOta(){try{if(window.AndroidOTA&&AndroidOTA.checkNow)AndroidOTA.checkNow()}catch(e){}},
   say(){if(TASK)speak(TASK.say)},
   buddy(e){dance(e);sfx('star');burst(e);const h=new Date().getHours();
     speak(X(`Good ${h<12?'morning':h<17?'afternoon':'evening'}!`,`Selamat ${h<11?'pagi':h<15?'siang':h<18?'sore':'malam'}!`))},

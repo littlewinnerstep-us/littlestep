@@ -42,20 +42,24 @@ jobs:
           open(p, "w", encoding="utf-8").write(s)
           print("Stamped:", ver, built)
           '
-      - name: Generate version.json manifest
+      - name: Generate version.json manifest and web-bundle.zip
         run: |
           python3 -c '
-          import json, os
+          import json, os, zipfile
           files = []
           for root, _, names in os.walk("web"):
               for n in sorted(names):
-                  if n == "version.json":
+                  if n in ("version.json", "web-bundle.zip"):
                       continue
                   rel = os.path.relpath(os.path.join(root, n), "web").replace(os.sep, "/")
                   files.append(rel)
+          files = sorted(files)
+          with zipfile.ZipFile("web/web-bundle.zip", "w", zipfile.ZIP_DEFLATED) as zf:
+              for rel in files:
+                  zf.write(os.path.join("web", rel), rel)
           with open("web/version.json", "w", encoding="utf-8") as f:
-              json.dump({"version": os.environ["GITHUB_SHA"], "files": sorted(files)}, f, indent=2)
-          print("Manifest files:", len(files))
+              json.dump({"version": os.environ["GITHUB_SHA"], "bundle": "web-bundle.zip", "files": files}, f, indent=2)
+          print("Manifest files:", len(files), "Bundle bytes:", os.path.getsize("web/web-bundle.zip"))
           '
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

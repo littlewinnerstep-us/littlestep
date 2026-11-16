@@ -25,6 +25,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Locale;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 public class MainActivity extends Activity {
 
@@ -78,6 +80,7 @@ public class MainActivity extends Activity {
         web.setHapticFeedbackEnabled(false);
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.addJavascriptInterface(new Bridge(), "AndroidTTS");
+        web.addJavascriptInterface(new OtaBridge(), "AndroidOTA");
 
         File otaIndex = new File(new File(getFilesDir(), "web"), "index.html");
         if (otaIndex.exists() && otaIndex.length() > 1000) {
@@ -85,7 +88,7 @@ public class MainActivity extends Activity {
         } else {
             web.loadUrl("file:///android_asset/index.html");
         }
-        checkAndUpdateWeb();
+        checkAndUpdateWeb(false);
     }
 
     /** Called by the game: AndroidTTS.speak(text), AndroidTTS.stop(), AndroidTTS.setLang("en"|"id"). */
@@ -207,43 +210,79 @@ public class MainActivity extends Activity {
     }
 
     private static final String OTA_BASE = "https://littlewinnerstep-us.github.io/littlestep/";
+    private volatile boolean otaRunning = false;
 
-    private void checkAndUpdateWeb() {
+    private class OtaBridge {
+        @JavascriptInterface
+        public void checkNow() {
+            checkAndUpdateWeb(true);
+        }
+    }
+
+    private void otaToast(String msg) {
+        runOnUiThread(() -> {
+            if (web != null) {
+                web.evaluateJavascript("window.toast&&toast(" + JSONObject.quote(msg) + ")", null);
+            }
+        });
+    }
+
+    private void checkAndUpdateWeb(boolean manual) {
+        if (otaRunning) {
+            if (manual) otaToast("Checking for updates...");
+            return;
+        }
+        otaRunning = true;
+        if (manual) otaToast("Checking for updates...");
         new Thread(() -> {
             try {
-                String jsonStr = httpGetString(OTA_BASE + "version.json");
-                if (jsonStr == null) return;
+                String jsonStr = httpGetString(OTA_BASE + "version.json?t=" + System.currentTimeMillis());
+                if (jsonStr == null) {
+                    if (manual) otaToast("Cannot reach update server");
+                    return;
+                }
                 JSONObject manifest = new JSONObject(jsonStr);
                 String remoteVer = manifest.optString("version", "");
+                String bundle = manifest.optString("bundle", "");
                 JSONArray files = manifest.optJSONArray("files");
-                if (remoteVer.isEmpty() || files == null || files.length() == 0) return;
+                if (remoteVer.isEmpty() || (bundle.isEmpty() && (files == null || files.length() == 0))) return;
 
                 SharedPreferences prefs = getSharedPreferences("ls_ota", MODE_PRIVATE);
                 File webDir = new File(getFilesDir(), "web");
                 File localIndex = new File(webDir, "index.html");
                 if (remoteVer.equals(prefs.getString("web_version", "")) && localIndex.exists()) {
+                    if (manual) otaToast("Already up to date (" + remoteVer.substring(0, Math.min(7, remoteVer.length())) + ")");
                     return;
                 }
 
+                if (manual) otaToast("Downloading update...");
                 File tmpDir = new File(getFilesDir(), "web_tmp");
                 deleteRecursive(tmpDir);
                 if (!tmpDir.mkdirs() && !tmpDir.isDirectory()) return;
 
-                for (int i = 0; i < files.length(); i++) {
-                    String rel = files.getString(i);
-                    if (rel.contains("..") || rel.startsWith("/")) return;
-                    File dst = new File(tmpDir, rel);
-                    File parent = dst.getParentFile();
-                    if (parent != null && !parent.exists() && !parent.mkdirs()) return;
-                    if (!httpDownload(OTA_BASE + rel, dst)) {
-                        deleteRecursive(tmpDir);
-                        return;
+                boolean ok = false;
+                if (!bundle.isEmpty() && !bundle.contains("..") && !bundle.startsWith("/")) {
+                    File zipFile = new File(getFilesDir(), "web_bundle.zip");
+                    if (httpDownload(OTA_BASE + bundle, zipFile)) {
+                        ok = unzipSafe(zipFile, tmpDir);
+                    }
+                    zipFile.delete();
+                } else if (files != null) {
+                    ok = true;
+                    for (int i = 0; i < files.length(); i++) {
+                        String rel = files.getString(i);
+                        if (rel.contains("..") || rel.startsWith("/")) { ok = false; break; }
+                        File dst = new File(tmpDir, rel);
+                        File parent = dst.getParentFile();
+                        if (parent != null && !parent.exists() && !parent.mkdirs()) { ok = false; break; }
+                        if (!httpDownload(OTA_BASE + rel, dst)) { ok = false; break; }
                     }
                 }
 
                 File tmpIndex = new File(tmpDir, "index.html");
-                if (!tmpIndex.exists() || tmpIndex.length() < 1000) {
+                if (!ok || !tmpIndex.exists() || tmpIndex.length() < 1000) {
                     deleteRecursive(tmpDir);
+                    if (manual) otaToast("Update download failed");
                     return;
                 }
 
@@ -261,14 +300,46 @@ public class MainActivity extends Activity {
                 final String newUrl = Uri.fromFile(new File(webDir, "index.html")).toString();
                 runOnUiThread(() -> {
                     if (web == null) return;
-                    web.evaluateJavascript(
-                        "if(typeof CUR!=='undefined'&&CUR==='home'){location.replace('" + newUrl + "');}"
-                        + "else if(window.toast){toast('Update ready — will apply next open');}",
-                        null
-                    );
+                    if (manual) {
+                        web.evaluateJavascript("window.toast&&toast('Updated! Reloading...');setTimeout(()=>location.replace('" + newUrl + "'),700);", null);
+                    } else {
+                        web.evaluateJavascript(
+                            "if(typeof CUR!=='undefined'&&CUR==='home'){location.replace('" + newUrl + "');}"
+                            + "else if(window.toast){toast('Update ready — will apply next open');}",
+                            null
+                        );
+                    }
                 });
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) {
+                if (manual) otaToast("Update failed");
+            } finally {
+                otaRunning = false;
+            }
         }).start();
+    }
+
+    private static boolean unzipSafe(File zipFile, File dstDir) {
+        try {
+            String dstCanon = dstDir.getCanonicalPath() + File.separator;
+            try (ZipInputStream zis = new ZipInputStream(new java.io.FileInputStream(zipFile))) {
+                ZipEntry entry;
+                byte[] buf = new byte[8192];
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.isDirectory()) continue;
+                    File out = new File(dstDir, entry.getName());
+                    if (!out.getCanonicalPath().startsWith(dstCanon)) return false;
+                    File parent = out.getParentFile();
+                    if (parent != null && !parent.exists() && !parent.mkdirs()) return false;
+                    try (FileOutputStream fos = new FileOutputStream(out)) {
+                        int n;
+                        while ((n = zis.read(buf)) != -1) fos.write(buf, 0, n);
+                    }
+                }
+            }
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static String httpGetString(String urlStr) {
