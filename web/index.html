@@ -862,6 +862,20 @@ function renderParent(){enter('parent');const s=S.settings,p=S.profile,done=S.pr
    <h2 style="margin-top:14px">${X('Last tasks','Tugas terakhir')}</h2><div class="tw"><table><tr><th>${X('Date','Tanggal')}</th><th>${X('Task','Tugas')}</th><th>Lv</th><th>${X('Time','Waktu')}</th><th>${X('Tries','Percobaan')}</th></tr>${trace}</table></div>
    <h2 style="margin-top:14px">${X('Recent days','Hari terakhir')}</h2><div class="tw"><table><tr><th>${X('Day','Hari')}</th><th>${X('Date','Tanggal')}</th><th>${X('Sessions','Sesi')}</th><th>${X('Tries','Percobaan')}</th><th>${X('Breaks','Istirahat')}</th><th>${X('Min','Mnt')}</th></tr>${recent}</table></div>
    <p class="soft" style="font-size:14px">${X('"Tries" are wrong taps. "Pace" compares the last 3 times with the 3 before.','"Percobaan" adalah ketukan yang salah. "Tempo" membandingkan 3 kali terakhir dengan 3 kali sebelumnya.')}</p></div>
+  <div class="card sec"><h2>${X('Backup & Restore','Cadangan & Pulihkan')}</h2>
+   <p class="soft" style="font-size:14px">${X('Save or restore progress, settings, profile, and all game levels.','Simpan atau pulihkan kemajuan, pengaturan, profil, dan semua level game.')}</p>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <button class="btn sm" style="flex:1" data-a="bkPhone">💾 ${X('Save to phone','Simpan ke HP')}</button>
+    <button class="btn alt sm" style="flex:1" data-a="rsPhone">📂 ${X('Restore file','Pulihkan file')}</button>
+   </div>
+   <input id="bkfile" type="file" accept=".json,application/json" style="display:none">
+   <div class="row">${X('GitHub Token','Token GitHub')}<input id="ghtok" type="password" placeholder="ghp_..." value="${esc(localStorage.getItem('littleSteps.ghToken')||'')}" style="width:55%"></div>
+   <div class="row">${X('Gist ID (auto-filled)','ID Gist (otomatis)')}<input id="ghgist" placeholder="${X('Optional for new','Opsional utk baru')}" value="${esc(localStorage.getItem('littleSteps.ghGist')||'')}" style="width:55%"></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+    <button class="btn sun sm" style="flex:1" data-a="bkGh">☁️ ${X('Backup to GitHub','Cadangkan ke GitHub')}</button>
+    <button class="btn alt sm" style="flex:1" data-a="rsGh">☁️ ${X('Restore GitHub','Pulihkan GitHub')}</button>
+   </div>
+  </div>
   <div class="card sec"><h2>${X('Tools','Alat')}</h2>
    <button class="btn alt wide" data-a="unlock">${X('🔓 Unlock next day now','🔓 Buka hari berikutnya sekarang')}</button>
    <div class="row" style="margin-top:8px">${X('Go to day','Ke hari')}<input id="gday" type="number" min="1" max="365" value="${Math.min(S.progress.day,365)}" style="width:90px"><button class="btn sun sm" data-a="gotoDay">${X('Go','Pergi')}</button></div>
@@ -912,6 +926,27 @@ const ACT={
   lvl(e){const t=e.dataset.t,k=sk(t);k.lvl=Math.max(1,Math.min(MAXL[t],k.lvl+Number(e.dataset.v)));k.h=[];save();e.parentNode.querySelector('b').textContent=k.lvl},
   unlock(){const P=S.progress;if(S.session)return toast(X('End the current mission first','Akhiri misi saat ini dulu'));if(P.cur.parts.some(x=>x)&&P.day<=365)closeDay(todayStr());P.lastDate=null;save();toast(X('Next day unlocked','Hari berikutnya dibuka'));renderParent()},
   gotoDay(){const n=parseInt($('#gday').value,10);if(!(n>=1&&n<=365))return toast(X('Pick a day from 1 to 365','Pilih hari 1 sampai 365'));S.progress.day=n;S.progress.cur=newCur();S.progress.lastDate=null;S.session=null;save();toast(X('Now on day '+n,'Sekarang di hari '+n));renderParent()},
+  bkPhone(){const d=new Date().toISOString().slice(0,10),fn=`littlesteps-backup-${d}.json`,js=makeBackup();
+    if(window.AndroidBackup&&AndroidBackup.save){AndroidBackup.save(fn,js);return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([js],{type:'application/json'}));a.download=fn;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);toast(X('Backup downloaded','Cadangan diunduh'))},
+  rsPhone(){if(window.AndroidBackup&&AndroidBackup.pick){AndroidBackup.pick();return}
+    const f=$('#bkfile');if(!f)return;f.value='';f.onchange=()=>{const file=f.files&&f.files[0];if(!file)return;const r=new FileReader();r.onload=()=>applyBackup(r.result);r.readAsText(file)};f.click()},
+  async bkGh(){const tok=($('#ghtok').value||'').trim(),gid=($('#ghgist').value||'').trim();if(!tok)return toast(X('Enter GitHub Token first','Masukkan Token GitHub dulu'));
+    localStorage.setItem('littleSteps.ghToken',tok);if(gid)localStorage.setItem('littleSteps.ghGist',gid);
+    try{toast(X('Uploading to GitHub...','Mengunggah ke GitHub...'));
+      const res=await fetch(gid?`https://api.github.com/gists/${encodeURIComponent(gid)}`:'https://api.github.com/gists',{
+        method:gid?'PATCH':'POST',headers:{Authorization:`Bearer ${tok}`,Accept:'application/vnd.github+json','Content-Type':'application/json'},
+        body:JSON.stringify({description:'Little Steps Backup',public:false,files:{'littlesteps-backup.json':{content:makeBackup()}}})});
+      const j=await res.json();if(!res.ok)throw new Error(j.message||res.status);
+      if(j.id){localStorage.setItem('littleSteps.ghGist',j.id);if($('#ghgist'))$('#ghgist').value=j.id}
+      toast(X('Backed up to GitHub!','Tercadangkan ke GitHub!'))}catch(e){toast(X('GitHub error: ','Gagal GitHub: ')+e.message)}},
+  async rsGh(){const tok=($('#ghtok').value||'').trim(),gid=($('#ghgist').value||'').trim();if(!tok||!gid)return toast(X('Enter Token and Gist ID','Masukkan Token dan ID Gist'));
+    localStorage.setItem('littleSteps.ghToken',tok);localStorage.setItem('littleSteps.ghGist',gid);
+    try{toast(X('Loading from GitHub...','Memuat dari GitHub...'));
+      const res=await fetch(`https://api.github.com/gists/${encodeURIComponent(gid)}`,{headers:{Authorization:`Bearer ${tok}`,Accept:'application/vnd.github+json'}});
+      const j=await res.json();if(!res.ok)throw new Error(j.message||res.status);
+      const f=j.files&&j.files['littlesteps-backup.json'];if(!f||!f.content)throw new Error('Backup file not found in Gist');
+      applyBackup(f.content)}catch(e){toast(X('GitHub error: ','Gagal GitHub: ')+e.message)}},
   endMission(){S.session=null;save();toast(X('Mission ended','Misi diakhiri'));renderParent()},
   reset(e){if(!e.dataset.armed){e.dataset.armed='1';e.textContent=X('Tap again to erase everything','Ketuk lagi untuk menghapus semua');setT(()=>{if(e.isConnected){delete e.dataset.armed;e.textContent=X('Reset all progress','Atur ulang semua kemajuan')}},4000);return}
     S.progress=clone(DEF.progress);S.skills={};S.log=[];S.session=null;save();toast(X('Progress reset','Kemajuan diatur ulang'));renderParent()}
@@ -927,6 +962,11 @@ setInterval(()=>{if(!TASK||TASK.fin||document.hidden||CUR!=='task')return;TASK.s
 document.addEventListener('visibilitychange',()=>{if(document.hidden)window.appPause();else window.appResume()});
 window.goHome=()=>{if(CUR==='home'||CUR==='setup')return false;renderHome();return true};
 window.getReport=()=>JSON.stringify({profile:S.profile,progress:S.progress,skills:S.skills,log:S.log});
+function makeBackup(){return JSON.stringify({app:'LittleSteps',version:2,exportedAt:new Date().toISOString(),data:S},null,2)}
+function applyBackup(raw){try{const p=JSON.parse(raw),d=p&&p.data?p.data:p;if(!d||!d.progress||!d.settings)throw new Error('Invalid');
+  const b=clone(DEF);S={...b,...d,settings:{...b.settings,...d.settings},progress:{...b.progress,...d.progress,cur:{...newCur(),...(d.progress&&d.progress.cur)}},skills:{...(d.skills||{})},log:Array.isArray(d.log)?d.log:[],session:d.session||null};
+  save();applyTheme();applyAnim();document.body.classList.toggle('reduce',!!S.settings.reduceMotion);toast(X('Backup restored!','Cadangan dipulihkan!'));renderParent()}catch(e){toast(X('Invalid backup file','File cadangan tidak valid'))}}
+window.onBackupLoaded=applyBackup;
 document.documentElement.lang=S.settings.lang;
 applyTheme();
 try{if(window.AndroidTTS&&AndroidTTS.setLang)AndroidTTS.setLang(S.settings.lang)}catch(e){}

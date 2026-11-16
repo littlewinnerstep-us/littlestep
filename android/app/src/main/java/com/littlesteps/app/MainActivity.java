@@ -2,10 +2,14 @@ package com.littlesteps.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ContentValues;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.speech.tts.TextToSpeech;
 import android.view.View;
 import android.view.WindowManager;
@@ -81,6 +85,7 @@ public class MainActivity extends Activity {
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.addJavascriptInterface(new Bridge(), "AndroidTTS");
         web.addJavascriptInterface(new OtaBridge(), "AndroidOTA");
+        web.addJavascriptInterface(new BackupBridge(), "AndroidBackup");
 
         SharedPreferences prefs = getSharedPreferences("ls_ota", MODE_PRIVATE);
         File otaIndex = new File(new File(getFilesDir(), "web"), "index.html");
@@ -209,6 +214,89 @@ public class MainActivity extends Activity {
         }
         web.destroy();
         super.onDestroy();
+    }
+
+    private static final int REQ_BACKUP_PICK = 91;
+    private static final int REQ_BACKUP_SAVE = 92;
+    private volatile String pendingBackupJson = null;
+
+    private class BackupBridge {
+        @JavascriptInterface
+        public void save(String filename, String json) {
+            if (json == null) return;
+            if (Build.VERSION.SDK_INT >= 29) {
+                try {
+                    ContentValues cv = new ContentValues();
+                    cv.put(MediaStore.Downloads.DISPLAY_NAME, filename);
+                    cv.put(MediaStore.Downloads.MIME_TYPE, "application/json");
+                    cv.put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS);
+                    Uri uri = getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, cv);
+                    if (uri != null) {
+                        try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                            if (out != null) {
+                                out.write(json.getBytes("UTF-8"));
+                                otaToast("Backup saved to Download/" + filename);
+                                return;
+                            }
+                        }
+                    }
+                } catch (Exception ignored) { }
+            }
+            pendingBackupJson = json;
+            runOnUiThread(() -> {
+                Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("application/json");
+                i.putExtra(Intent.EXTRA_TITLE, filename);
+                startActivityForResult(i, REQ_BACKUP_SAVE);
+            });
+        }
+
+        @JavascriptInterface
+        public void pick() {
+            runOnUiThread(() -> {
+                Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                i.addCategory(Intent.CATEGORY_OPENABLE);
+                i.setType("*/*");
+                startActivityForResult(i, REQ_BACKUP_PICK);
+            });
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int reqCode, int resCode, Intent data) {
+        super.onActivityResult(reqCode, resCode, data);
+        if (resCode != RESULT_OK || data == null || data.getData() == null) return;
+        Uri uri = data.getData();
+        if (reqCode == REQ_BACKUP_SAVE) {
+            String json = pendingBackupJson;
+            pendingBackupJson = null;
+            if (json == null) return;
+            try (java.io.OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out != null) {
+                    out.write(json.getBytes("UTF-8"));
+                    otaToast("Backup saved");
+                }
+            } catch (Exception e) {
+                otaToast("Could not save backup");
+            }
+        } else if (reqCode == REQ_BACKUP_PICK) {
+            try (InputStream in = getContentResolver().openInputStream(uri)) {
+                if (in == null) return;
+                BufferedReader br = new BufferedReader(new InputStreamReader(in, "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line).append('\n');
+                final String content = sb.toString();
+                runOnUiThread(() -> {
+                    if (web != null) {
+                        web.evaluateJavascript("window.onBackupLoaded&&onBackupLoaded(" + JSONObject.quote(content) + ")", null);
+                    }
+                });
+            } catch (Exception e) {
+                otaToast("Could not read backup file");
+            }
+        }
     }
 
     private static final String OTA_BASE = "https://littlewinnerstep-us.github.io/littlestep/";
