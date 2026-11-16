@@ -103,15 +103,15 @@ def extract_game_lines():
             en.append(f"{r_en}. Tap the steps in order. What comes first?")
             id_.append(f"{r_id}. Ketuk langkah-langkahnya berurutan. Apa yang pertama?")
 
-    # SORTS
+    # SORTS (both A/B and B/A orders)
     sort_m = re.search(r"const SORTS=\[(.*?)\];", html, re.S)
     if sort_m:
         for a_en, a_id, b_en, b_id in re.findall(
             r"a:\['([^']+)','[^']+',\[[^\]]+\],'([^']+)'\],b:\['([^']+)','[^']+',\[[^\]]+\],'([^']+)'\]",
             sort_m.group(1),
         ):
-            en.append(f"Put each picture in the right basket. {a_en}, or {b_en}?")
-            id_.append(f"Masukkan tiap gambar ke keranjang yang benar. {a_id}, atau {b_id}?")
+            en.extend([f"{a_en} or {b_en}? Tap the right picture.", f"{b_en} or {a_en}? Tap the right picture."])
+            id_.extend([f"{a_id} atau {b_id}? Ketuk gambar yang benar.", f"{b_id} atau {a_id}? Ketuk gambar yang benar."])
 
     return list(dict.fromkeys(en)), list(dict.fromkeys(id_))
 roots = [os.path.join(here, "..")]

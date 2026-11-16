@@ -567,7 +567,7 @@ const BUILD={
       else{if(++mm>p)TASK.miss();lock=true;setT(()=>{[x,y].forEach(z=>{z[0].classList.remove('up');z[0].textContent='✿'});lock=false},900)}}};g.appendChild(b)});a.appendChild(g)}}},
  sort(r,L,th){const P=pick(r,SORTS);const sw=r()<.5;const A=sw?P.b:P.a,B=sw?P.a:P.b;const per=[2,3,4,5,6][L-1];const an=lg()?A[3]:A[0],bn=lg()?B[3]:B[0];
   const items=shuffle(r,[...sample(r,A[2],per).map(e=>[e,0]),...sample(r,B[2],per).map(e=>[e,1])]);
-  return{text:X(`<b>${esc(an)}</b> or <b>${esc(bn)}</b>? Tap the right basket`,`<b>${esc(an)}</b> atau <b>${esc(bn)}</b>? Ketuk keranjang yang benar`),say:X(`Put each picture in the right basket. ${an}, or ${bn}?`,`Masukkan tiap gambar ke keranjang yang benar. ${an}, atau ${bn}?`),win:X('Everything is sorted!','Semua sudah terpilah!'),
+  return{text:X(`<b>${esc(an)}</b> or <b>${esc(bn)}</b>? Tap the right picture`,`<b>${esc(an)}</b> atau <b>${esc(bn)}</b>? Ketuk gambar yang benar`),say:X(`${an} or ${bn}? Tap the right picture.`,`${an} atau ${bn}? Ketuk gambar yang benar.`),win:X('Everything is sorted!','Semua sudah terpilah!'),
    mount(a){const big=el('div','sortitem'),left=el('div','left'),bins=el('div','bins');let i=0,wrong=0;
     const show=()=>{big.textContent=items[i][0];left.textContent=X(`${items.length-i} left`,`Sisa ${items.length-i}`)};
     const bb=[[A,an],[B,bn]].map((c,ci)=>{const b=el('button','opt bin',`${c[0][1]}<small>${esc(c[1])}</small>`);
