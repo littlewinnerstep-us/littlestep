@@ -258,6 +258,10 @@ public class MainActivity extends Activity {
                 Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
                 i.addCategory(Intent.CATEGORY_OPENABLE);
                 i.setType("*/*");
+                if (Build.VERSION.SDK_INT >= 26) {
+                    i.putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                            Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload"));
+                }
                 startActivityForResult(i, REQ_BACKUP_PICK);
             });
         }
