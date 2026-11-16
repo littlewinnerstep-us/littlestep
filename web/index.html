@@ -289,8 +289,8 @@ const ckey=t=>(lg()?'id|':'en|')+t;
 function cdb(){return CDB||(CDB=new Promise((ok,no)=>{try{const r=indexedDB.open('littleSteps.clips',1);r.onupgradeneeded=()=>r.result.createObjectStore('c');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)}catch(e){no(e)}}))}
 function cput(k,blob){return cdb().then(d=>new Promise((ok,no)=>{const t=d.transaction('c','readwrite');blob?t.objectStore('c').put(blob,k):t.objectStore('c').delete(k);t.oncomplete=ok;t.onerror=()=>no(t.error)}))}
 function cload(){return cdb().then(d=>{const q=d.transaction('c').objectStore('c').openCursor();q.onsuccess=()=>{const c=q.result;if(c){CLIPS[c.key]=URL.createObjectURL(c.value);c.continue()}}}).catch(()=>{})}
-const hasClip=t=>!!(CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]));
-function playClip(t,onDone,vol){const u=CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]);if(!u)return false;try{if(CLIPAUD)CLIPAUD.pause();CLIPAUD=new Audio(u);CLIPAUD.volume=vol!=null?vol:.62;CLIPAUD.onended=onDone||null;CLIPAUD.play().catch(()=>{});duck(5)}catch(e){return false}return true}
+const hasClip=t=>!!(CLIPS[ckey(t)]||(!lg()&&window.BUNDLED&&BUNDLED[ckey(t)]));
+function playClip(t,onDone,vol){const u=CLIPS[ckey(t)]||(!lg()&&window.BUNDLED&&BUNDLED[ckey(t)]);if(!u)return false;try{if(CLIPAUD)CLIPAUD.pause();CLIPAUD=new Audio(u);CLIPAUD.volume=vol!=null?vol:.62;CLIPAUD.onended=onDone||null;CLIPAUD.play().catch(()=>{});duck(5)}catch(e){return false}return true}
 function voiceLines(){const o=[];PRAISE.forEach(x=>o.push(X(x[0],x[1])));MISS.forEach(x=>o.push(X(x[0],x[1])));
   o.push(X('Look where the hand points.','Lihat yang ditunjuk tangan.'),X('You can take a break if you want.','Kamu boleh istirahat kalau mau.'),X('Break time! Pick something calm to do.','Waktu istirahat! Pilih kegiatan yang tenang.'));return o}
 let REC=null;
