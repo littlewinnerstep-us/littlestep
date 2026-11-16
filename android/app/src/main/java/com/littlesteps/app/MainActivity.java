@@ -82,13 +82,15 @@ public class MainActivity extends Activity {
         web.addJavascriptInterface(new Bridge(), "AndroidTTS");
         web.addJavascriptInterface(new OtaBridge(), "AndroidOTA");
 
+        SharedPreferences prefs = getSharedPreferences("ls_ota", MODE_PRIVATE);
         File otaIndex = new File(new File(getFilesDir(), "web"), "index.html");
         if (otaIndex.exists() && otaIndex.length() > 1000) {
-            web.loadUrl(Uri.fromFile(otaIndex).toString());
+            web.clearCache(true);
+            web.loadUrl(Uri.fromFile(otaIndex).toString() + "?v=" + prefs.getString("web_version", "1"));
         } else {
             web.loadUrl("file:///android_asset/index.html");
         }
-        checkAndUpdateWeb(false);
+        checkAndUpdateWeb(false, null);
     }
 
     /** Called by the game: AndroidTTS.speak(text), AndroidTTS.stop(), AndroidTTS.setLang("en"|"id"). */
@@ -215,7 +217,12 @@ public class MainActivity extends Activity {
     private class OtaBridge {
         @JavascriptInterface
         public void checkNow() {
-            checkAndUpdateWeb(true);
+            checkAndUpdateWeb(true, null);
+        }
+
+        @JavascriptInterface
+        public void checkNow(String currentVer) {
+            checkAndUpdateWeb(true, currentVer);
         }
     }
 
@@ -227,7 +234,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void checkAndUpdateWeb(boolean manual) {
+    private void checkAndUpdateWeb(boolean manual, String currentUiVer) {
         if (otaRunning) {
             if (manual) otaToast("Checking for updates...");
             return;
@@ -251,7 +258,18 @@ public class MainActivity extends Activity {
                 File webDir = new File(getFilesDir(), "web");
                 File localIndex = new File(webDir, "index.html");
                 if (remoteVer.equals(prefs.getString("web_version", "")) && localIndex.exists()) {
-                    if (manual) otaToast("Already up to date (" + remoteVer.substring(0, Math.min(7, remoteVer.length())) + ")");
+                    if (manual) {
+                        if (currentUiVer != null && !currentUiVer.isEmpty() && !remoteVer.startsWith(currentUiVer)) {
+                            final String reloadUrl = Uri.fromFile(localIndex).toString() + "?v=" + remoteVer;
+                            runOnUiThread(() -> {
+                                if (web == null) return;
+                                web.clearCache(true);
+                                web.loadUrl(reloadUrl);
+                            });
+                        } else {
+                            otaToast("Already up to date (" + remoteVer.substring(0, Math.min(7, remoteVer.length())) + ")");
+                        }
+                    }
                     return;
                 }
 
@@ -297,11 +315,17 @@ public class MainActivity extends Activity {
                 deleteRecursive(bakDir);
                 prefs.edit().putString("web_version", remoteVer).apply();
 
-                final String newUrl = Uri.fromFile(new File(webDir, "index.html")).toString();
+                final String newUrl = Uri.fromFile(new File(webDir, "index.html")).toString() + "?v=" + remoteVer;
                 runOnUiThread(() -> {
                     if (web == null) return;
                     if (manual) {
-                        web.evaluateJavascript("window.toast&&toast('Updated! Reloading...');setTimeout(()=>location.replace('" + newUrl + "'),700);", null);
+                        web.evaluateJavascript("window.toast&&toast('Updated! Reloading...');", null);
+                        web.postDelayed(() -> {
+                            if (web != null) {
+                                web.clearCache(true);
+                                web.loadUrl(newUrl);
+                            }
+                        }, 700);
                     } else {
                         web.evaluateJavascript(
                             "if(typeof CUR!=='undefined'&&CUR==='home'){location.replace('" + newUrl + "');}"

@@ -878,7 +878,7 @@ function renderParent(){enter('parent');const s=S.settings,p=S.profile,done=S.pr
 /* ---------- actions ---------- */
 const ACT={
   home:renderHome,play:renderPlay,year:renderYear,stickers:renderStickers,gate:renderGate,
-  checkOta(){try{if(window.AndroidOTA&&AndroidOTA.checkNow)AndroidOTA.checkNow()}catch(e){}},
+  checkOta(){try{if(window.AndroidOTA&&AndroidOTA.checkNow)AndroidOTA.checkNow(BUILD_INFO.ver)}catch(e){}},
   say(){if(TASK)speak(TASK.say)},
   buddy(e){dance(e);sfx('star');burst(e);const h=new Date().getHours();
     speak(X(`Good ${h<12?'morning':h<17?'afternoon':'evening'}!`,`Selamat ${h<11?'pagi':h<15?'siang':h<18?'sore':'malam'}!`))},
