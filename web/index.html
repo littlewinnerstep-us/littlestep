@@ -921,7 +921,7 @@ app.addEventListener('click',e=>{const t=e.target.closest('[data-a]');if(!t||!ap
 
 /* task stopwatch: counts only while a task is on screen and visible; never shown to the child */
 setInterval(()=>{if(!TASK||TASK.fin||document.hidden||CUR!=='task')return;TASK.sec++;TASK.idle++;if(TASK.onTick)TASK.onTick(TASK.sec);
-  if(S.settings.tips&&TASK.target&&TASK.idle>=(S.profile&&S.profile.age==='7-10'?15:10)&&!document.querySelector('#area .hand')){const tb=TASK.target();if(tb){TASK.hinted=true;TASK.handSaid=true;TASK.idle=0;showHint(tb);speak(X('Look where the hand points.','Lihat yang ditunjuk tangan.'),'help')}}
+  if(S.settings.tips&&TASK.target&&TASK.idle>=15&&!document.querySelector('#area .hand')){const tb=TASK.target();if(tb){TASK.hinted=true;TASK.handSaid=true;TASK.idle=0;showHint(tb);speak(X('Look where the hand points.','Lihat yang ditunjuk tangan.'),'help')}}
   if(!TASK.nudged&&TASK.type!=='calm'){const k=S.skills[TASK.type],avg=k&&k.n?k.sec/k.n:0;
     if(TASK.sec>=Math.max(90,avg*2.5)){TASK.nudged=true;const b=$('.break-btn');if(b){b.classList.add('nudge');speak(X('You can take a break if you want.','Kamu boleh istirahat kalau mau.'))}}}},1000);
 document.addEventListener('visibilitychange',()=>{if(document.hidden)window.appPause();else window.appResume()});
