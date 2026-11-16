@@ -290,7 +290,7 @@ function cdb(){return CDB||(CDB=new Promise((ok,no)=>{try{const r=indexedDB.open
 function cput(k,blob){return cdb().then(d=>new Promise((ok,no)=>{const t=d.transaction('c','readwrite');blob?t.objectStore('c').put(blob,k):t.objectStore('c').delete(k);t.oncomplete=ok;t.onerror=()=>no(t.error)}))}
 function cload(){return cdb().then(d=>{const q=d.transaction('c').objectStore('c').openCursor();q.onsuccess=()=>{const c=q.result;if(c){CLIPS[c.key]=URL.createObjectURL(c.value);c.continue()}}}).catch(()=>{})}
 const hasClip=t=>!!(CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]));
-function playClip(t){const u=CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]);if(!u)return false;try{if(CLIPAUD)CLIPAUD.pause();CLIPAUD=new Audio(u);CLIPAUD.play().catch(()=>{});duck(5)}catch(e){return false}return true}
+function playClip(t,onDone){const u=CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]);if(!u)return false;try{if(CLIPAUD)CLIPAUD.pause();CLIPAUD=new Audio(u);CLIPAUD.onended=onDone||null;CLIPAUD.play().catch(()=>{});duck(5)}catch(e){return false}return true}
 function voiceLines(){const o=[];PRAISE.forEach(x=>o.push(X(x[0],x[1])));MISS.forEach(x=>o.push(X(x[0],x[1])));
   o.push(X('Look where the hand points.','Lihat yang ditunjuk tangan.'),X('You can take a break if you want.','Kamu boleh istirahat kalau mau.'),X('Break time! Pick something calm to do.','Waktu istirahat! Pilih kegiatan yang tenang.'));return o}
 let REC=null;
@@ -320,9 +320,9 @@ function voiceState(){ // 'ok' | 'none' (no speech engine) | 'nolang' (engine ha
   const c=lg()?'id':'en';return vs.some(x=>x.lang&&x.lang.toLowerCase().replace('_','-').indexOf(c)===0)?'ok':'nolang'}
 function voiceMsg(st){return st==='none'?X('This device has no speech voice. Open the game in Chrome, or install a text-to-speech voice.','Perangkat ini tidak punya suara bicara. Buka game di Chrome, atau pasang suara text-to-speech.')
   :X('No voice for this language is installed. Install it in Android Settings > Text-to-speech.','Suara untuk bahasa ini belum terpasang. Pasang di Pengaturan Android > Text-to-speech.')}
-function speak(t,style,force){if(!S.settings.voice||!t)return;hush();const v=VSTYLE[style]||VSTYLE.say;let rate=v[0],pitch=v[1];
+function speak(t,style,force,onDone){if(!S.settings.voice||!t)return;hush();const v=VSTYLE[style]||VSTYLE.say;let rate=v[0],pitch=v[1];
   if(S.settings.voiceStyle==='calm'){rate*=.93;pitch=1+(pitch-1)*.35}
-  if(playClip(t))return;
+  if(playClip(t,onDone))return;
   duck(String(t).length*.07/rate+.6);
   const st=voiceState();if(st!=='ok'&&(force||!VWARN)){VWARN=1;toast(voiceMsg(st))}
   if(window.AndroidTTS&&AndroidTTS.speak){try{if(AndroidTTS.setLang)AndroidTTS.setLang(lg()?'id':'en');if(AndroidTTS.speakWith)AndroidTTS.speakWith(String(t),rate,pitch);else AndroidTTS.speak(String(t))}catch(e){}return}
@@ -690,7 +690,10 @@ function praise(o){const pr=pick(Math.random,PRAISE),w=X(pr[0],pr[1]);
    ${o.ch>0?`<div class="lvup">🚀 ${X('Level up!','Naik level!')}</div>`:''}
    ${o.tokens?`<div class="tokens lg" style="margin-top:12px">${o.tokens}</div><p class="soft">${o.left<=0?X('All stars! 🎁','Bintang penuh! 🎁'):X(`${o.left} more to go`,`Tinggal ${o.left} lagi`)}</p>`:''}
    <div class="btns"><button class="btn wide" data-o="next">${o.nextLabel||X('Next ▶','Lanjut ▶')}</button>${o.again?`<button class="btn alt wide" data-o="again">${X('🔁 Play again','🔁 Main lagi')}</button>`:''}</div>`);
-  document.body.appendChild(ov);if(o.ch>0)sfx('up');else sfx('star');speak(hasClip(w)?w:(o.win?o.win+' ':'')+w+(o.ch>0?X(' Level up!',' Naik level!'):''),'praise');burst(ov.querySelector('.st'));
+  document.body.appendChild(ov);if(o.ch>0)sfx('up');else sfx('star');
+  if(o.win&&hasClip(o.win))speak(o.win,'praise',false,o.ch>0?()=>speak(X('Level up!','Naik level!'),'praise'):null);
+  else speak(hasClip(w)?w:(o.win?o.win+' ':'')+w+(o.ch>0?X(' Level up!',' Naik level!'):''),'praise');
+  burst(ov.querySelector('.st'));
   let gone=false;const go=f=>{if(gone)return;gone=true;f()};
   ov.querySelector('[data-o=next]').onclick=()=>go(o.onNext);const ag=ov.querySelector('[data-o=again]');if(ag)ag.onclick=()=>go(o.onAgain);
   if(!o.again)setT(()=>go(o.onNext),2600)}

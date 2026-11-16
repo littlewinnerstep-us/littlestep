@@ -28,6 +28,9 @@ EN = [
     "Stretch up high", "Give yourself a big hug", "Shake your hands",
     "March in place", "Jump like a frog 3 times", "Push the wall hard",
     "Move slowly like a turtle", "Stand still like a tree", "Squeeze your hands, then let go",
+    "Yes, they are the same!", "Yes! That can help.", "You found the pattern!",
+    "All the steps in order!", "You found all the pairs!", "Everything is sorted!",
+    "That's a kind choice!", "Great listening!", "So calm and relaxed.", "Level up!",
 ]
 ID = [
     "Kerja bagus!", "Kamu berhasil!", "Hebat!", "Luar biasa!", "Keren!", "Bagus sekali!",
@@ -48,6 +51,9 @@ ID = [
     "Rentangkan tangan ke atas", "Peluk dirimu sendiri erat-erat", "Goyangkan tanganmu",
     "Berjalan di tempat", "Lompat seperti katak 3 kali", "Dorong dinding kuat-kuat",
     "Bergerak pelan seperti kura-kura", "Berdiri diam seperti pohon", "Genggam tanganmu erat, lalu lepaskan",
+    "Betul, gambarnya sama!", "Betul! Itu bisa membantu.", "Kamu menemukan polanya!",
+    "Semua langkah sudah urut!", "Kamu menemukan semua pasangan!", "Semua sudah terpilah!",
+    "Itu pilihan yang baik!", "Pintar mendengarkan!", "Tenang dan santai sekali.", "Naik level!",
 ]
 # Warm, soft voices. Change these to try others (run: edge-tts --list-voices)
 VOICES = {"en": "en-US-AnaNeural", "id": "id-ID-GadisNeural"}
@@ -68,15 +74,20 @@ def extract_game_lines():
     themes_m = re.search(r"const THEMES=\[(.*?)\];", html, re.S)
     if themes_m:
         for _, w_en, w_id in re.findall(r"\['([^']+)','([^']+)','([^']+)'\]", themes_m.group(1)):
-            en.append(f"Find the {w_en}.")
-            id_.append(f"Cari {w_id}.")
+            en.extend([f"Find the {w_en}.", f"Yes! That's the {w_en}!"])
+            id_.extend([f"Cari {w_id}.", f"Betul! Itu {w_id}!"])
+
+    # Counting wins (1..15)
+    for k in range(1, 16):
+        en.append(f"Yes! {k}! Great counting!")
+        id_.append(f"Betul! {k}! Pintar berhitung!")
 
     # Feelings: ['emoji','en','id']
     feel_m = re.search(r"const FEELINGS=\[(.*?)\];", html, re.S)
     if feel_m:
         for _, f_en, f_id in re.findall(r"\['([^']+)','([^']+)','([^']+)'\]", feel_m.group(1)):
-            en.append(f"Tap the {f_en} face.")
-            id_.append(f"Ketuk wajah {f_id}.")
+            en.extend([f"Tap the {f_en} face.", f"Yes! That's the {f_en} face!", f"Yes, they feel {f_en}."])
+            id_.extend([f"Ketuk wajah {f_id}.", f"Betul! Itu wajah {f_id}!", f"Betul, dia merasa {f_id}."])
 
     # META task names
     meta_m = re.search(r"const META=\{(.*?)\};", html, re.S)
