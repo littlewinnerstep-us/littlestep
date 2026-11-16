@@ -658,8 +658,7 @@ function renderPlan(){const s=S.session;if(!s)return renderHome();enter('plan');
 /* ---------- task runner (shared by missions and free play) ---------- */
 const MISS=[["Good try! Let's look again.",'Hampir! Ayo lihat lagi.'],["That's okay. Try again.",'Tidak apa-apa. Coba lagi ya.'],['Almost! You can do it.','Sedikit lagi! Kamu pasti bisa.'],['Take your time. You can do it.','Pelan-pelan saja. Kamu pasti bisa.']];
 let lastHelp=0;
-function helpVoice(T){setTimeout(()=>{if(TASK!==T||T.fin)return;const now=Date.now();if(now-lastHelp<2500)return;let line;
-  const hand=!!document.querySelector('#area .hand');
+function helpVoice(T){setTimeout(()=>{if(TASK!==T||T.fin)return;const now=Date.now(),hand=!!document.querySelector('#area .hand');if(!(hand&&!T.handSaid)&&now-lastHelp<2500)return;let line;
   if(T.type==='memory')line=X('Keep going, you are doing great.','Terus ya, kamu hebat.');
   else if(hand&&!T.handSaid){T.handSaid=true;line=X("That's okay. Look where the hand points.",'Tidak apa-apa. Lihat yang ditunjuk tangan.')}
   else if(T.m>=3&&T.m%2===1)line=hasClip(T.say)?T.say:X("Let's listen again. ",'Ayo dengarkan lagi. ')+T.say;
