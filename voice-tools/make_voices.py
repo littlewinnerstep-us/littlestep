@@ -128,10 +128,10 @@ async def main():
 
     async def gen(lang, i, text):
         name = f"{lang}_{i:03d}.mp3"
-        pitch = "+15Hz" if lang == "id" else "+2Hz"
-        rate = "-4%" if lang == "id" else "-5%"
+        pitch = "-2Hz" if lang == "id" else "-4Hz"
+        rate = "-15%" if lang == "id" else "-16%"
         async with sem:
-            tts = edge_tts.Communicate(text, VOICES[lang], rate=rate, pitch=pitch, volume="+0%")
+            tts = edge_tts.Communicate(text, VOICES[lang], rate=rate, pitch=pitch, volume="-15%")
             await tts.save(os.path.join(out, name))
         clips[f"{lang}|{text}"] = f"voice/{name}"
 

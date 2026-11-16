@@ -280,8 +280,8 @@ const SFX={tap:[[660],.05,'sine'],step:[[587],.08,'sine'],ok:[[523,659,784],.11,
 function sfx(name,shift){const md=S.settings.sound;if(!md||md==='off')return;const x=SFX[name],k=Math.pow(2,(shift||0)/12),lively=md==='lively';
   tone(x[0].map(f=>f*k),x[1],x[2],name==='no'?.03:(lively?.12:.05));
   if(lively&&(name==='ok'||name==='win'||name==='sticker'))tone([1568,2093,2637],.06,'sine',.04,x[0].length*x[1])}
-/* voice styles: [rate, pitch] — natural warmth without robotic pitch shifting */
-const VSTYLE={say:[.94,1.03],praise:[.98,1.06],help:[.82,1],calm:[.84,.98]};
+/* voice styles: [rate, pitch] — soft-spoken, slower, warm low tone */
+const VSTYLE={say:[.82,.96],praise:[.86,.98],help:[.74,.94],calm:[.76,.92]};
 const OPEN_EN=["Let's play!",'Ready?','Here we go!','',''],OPEN_ID=['Ayo main!','Siap?','Ayo kita mulai!','',''];
 /* ---------- parent-recorded voice clips (IndexedDB); used instead of the synthetic voice when a line has one ---------- */
 const CLIPS={};let CLIPAUD=null,CDB=null;
@@ -290,7 +290,7 @@ function cdb(){return CDB||(CDB=new Promise((ok,no)=>{try{const r=indexedDB.open
 function cput(k,blob){return cdb().then(d=>new Promise((ok,no)=>{const t=d.transaction('c','readwrite');blob?t.objectStore('c').put(blob,k):t.objectStore('c').delete(k);t.oncomplete=ok;t.onerror=()=>no(t.error)}))}
 function cload(){return cdb().then(d=>{const q=d.transaction('c').objectStore('c').openCursor();q.onsuccess=()=>{const c=q.result;if(c){CLIPS[c.key]=URL.createObjectURL(c.value);c.continue()}}}).catch(()=>{})}
 const hasClip=t=>!!(CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]));
-function playClip(t,onDone){const u=CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]);if(!u)return false;try{if(CLIPAUD)CLIPAUD.pause();CLIPAUD=new Audio(u);CLIPAUD.onended=onDone||null;CLIPAUD.play().catch(()=>{});duck(5)}catch(e){return false}return true}
+function playClip(t,onDone,vol){const u=CLIPS[ckey(t)]||(window.BUNDLED&&BUNDLED[ckey(t)]);if(!u)return false;try{if(CLIPAUD)CLIPAUD.pause();CLIPAUD=new Audio(u);CLIPAUD.volume=vol!=null?vol:.62;CLIPAUD.onended=onDone||null;CLIPAUD.play().catch(()=>{});duck(5)}catch(e){return false}return true}
 function voiceLines(){const o=[];PRAISE.forEach(x=>o.push(X(x[0],x[1])));MISS.forEach(x=>o.push(X(x[0],x[1])));
   o.push(X('Look where the hand points.','Lihat yang ditunjuk tangan.'),X('You can take a break if you want.','Kamu boleh istirahat kalau mau.'),X('Break time! Pick something calm to do.','Waktu istirahat! Pilih kegiatan yang tenang.'));return o}
 let REC=null;
@@ -322,7 +322,7 @@ function voiceMsg(st){return st==='none'?X('This device has no speech voice. Ope
   :X('No voice for this language is installed. Install it in Android Settings > Text-to-speech.','Suara untuk bahasa ini belum terpasang. Pasang di Pengaturan Android > Text-to-speech.')}
 function speak(t,style,force,onDone){if(!S.settings.voice||!t)return;hush();const v=VSTYLE[style]||VSTYLE.say;let rate=v[0],pitch=v[1];
   if(S.settings.voiceStyle==='calm'){rate*=.93;pitch=1+(pitch-1)*.35}
-  if(playClip(t,onDone))return;
+  if(playClip(t,onDone,(style==='help'||style==='calm')?.52:.62))return;
   duck(String(t).length*.07/rate+.6);
   const st=voiceState();if(st!=='ok'&&(force||!VWARN)){VWARN=1;toast(voiceMsg(st))}
   if(window.AndroidTTS&&AndroidTTS.speak){try{if(AndroidTTS.setLang)AndroidTTS.setLang(lg()?'id':'en');if(AndroidTTS.speakWith)AndroidTTS.speakWith(String(t),rate,pitch);else AndroidTTS.speak(String(t))}catch(e){}return}
@@ -502,7 +502,7 @@ const colsFor=n=>n<=2?2:n===4?2:n===8?4:3;
 function choiceGrid(area,opts,cols,cls=''){const g=el('div','grid c'+cols);g.style.setProperty('--c',cols);let wrong=0,done=false;
   const btns=opts.map(o=>{const b=el('button','opt '+cls,o.html);b.onclick=()=>{if(done)return;
     if(o.ok){done=true;b.classList.add('ok');TASK.success()}
-    else{nope(b);TASK.miss();if(++wrong>=2)btns.forEach((x,j)=>{if(opts[j].ok)showHint(x)})}};g.appendChild(b);return b});
+    else{nope(b);TASK.miss();if(++wrong>=5)btns.forEach((x,j)=>{if(opts[j].ok)showHint(x)})}};g.appendChild(b);return b});
   area.appendChild(g);if(TASK)TASK.target=()=>done?null:btns.find((x,j)=>opts[j].ok);return g}
 function numOpts(r,k,n){const ns=new Set([k]);let g=0;while(ns.size<n&&g++<80){const d=k+Math.floor(r()*5)-2;if(d>=1)ns.add(d)}let x=1;while(ns.size<n)ns.add(k+x++);
   return[...ns].sort((a,b)=>a-b).map(v=>({html:String(v),ok:v===k}))}
@@ -557,7 +557,7 @@ const BUILD={
      b.onclick=()=>{if(next>=k||b.classList.contains('used'))return;
       if(i===next){b.classList.add('used');const sl=slots.children[next];sl.classList.add('fill');sl.innerHTML=`<b>${next+1}</b>${st[i][0]}<small>${esc(nm(st[i]))}</small>`;next++;wrong=0;clearHints();
        if(next===k)TASK.success();else sfx('step',next*2)}
-      else{nope(b);TASK.miss();if(++wrong>=2)showHint(btns[order.indexOf(next)])}};g.appendChild(b);return b});a.appendChild(g);TASK.target=()=>next<k?btns[order.indexOf(next)]:null}}},
+      else{nope(b);TASK.miss();if(++wrong>=5)showHint(btns[order.indexOf(next)])}};g.appendChild(b);return b});a.appendChild(g);TASK.target=()=>next<k?btns[order.indexOf(next)]:null}}},
  memory(r,L,th){const p=[2,3,4,5,6,8][L-1];const it=sample(r,th.items,p).map(x=>x[0]);const deck=shuffle(r,[...it,...it]);
   return{text:X('Find the matching pairs','Cari pasangan yang sama'),say:X('Turn over two cards. Find the pairs that match.','Balik dua kartu. Cari pasangan yang cocok.'),win:X('You found all the pairs!','Kamu menemukan semua pasangan!'),
    mount(a){const g=el('div','grid'+(p>=4?' c4':''));g.style.setProperty('--c',p===2?2:(p===3?3:4));let open=[],lock=false,got=0,mm=0;
@@ -573,7 +573,7 @@ const BUILD={
     const bb=[[A,an],[B,bn]].map((c,ci)=>{const b=el('button','opt bin',`${c[0][1]}<small>${esc(c[1])}</small>`);
      b.onclick=()=>{if(i>=items.length)return;
       if(items[i][1]===ci){i++;wrong=0;clearHints();if(i>=items.length){big.textContent='✅';left.textContent=X('All sorted!','Semua sudah terpilah!');TASK.success()}else{sfx('step',i);show()}}
-      else{nope(b);TASK.miss();if(++wrong>=2)showHint(bb[items[i][1]])}};bins.appendChild(b);return b});
+      else{nope(b);TASK.miss();if(++wrong>=5)showHint(bb[items[i][1]])}};bins.appendChild(b);return b});
     a.append(big,left,bins);show();TASK.target=()=>i<items.length?bb[items[i][1]]:null}}},
  social(r,L,th){const sc=pick(r,SOCIAL);const idx=shuffle(r,[0,1,2].slice(0,L<=1?2:3));const opts=lg()?sc[4]:sc[2],scene=lg()?sc[3]:sc[1];
   return{text:esc(scene),say:X(`${scene} What should you do? ${idx.map(i=>opts[i]).join(OR())}.`,`${scene} Apa yang sebaiknya kamu lakukan? ${idx.map(i=>opts[i]).join(OR())}.`),win:X("That's a kind choice!",'Itu pilihan yang baik!'),
@@ -586,7 +586,7 @@ const BUILD={
     const btns=disp.map(t=>{const b=el('button','opt shape',shapeSVG(t[1],t[0]));
      b.onclick=()=>{if(next>=k||b.classList.contains('ok'))return;
       if(t===tg[next]){b.classList.add('ok');b.appendChild(el('span','badge',String(next+1)));next++;wrong=0;clearHints();if(next===k)TASK.success();else sfx('step',next*2)}
-      else{nope(b);TASK.miss();if(++wrong>=2)showHint(btns[disp.indexOf(tg[next])])}};g.appendChild(b);return b});a.appendChild(g);TASK.target=()=>next<k?btns[disp.indexOf(tg[next])]:null}}},
+      else{nope(b);TASK.miss();if(++wrong>=5)showHint(btns[disp.indexOf(tg[next])])}};g.appendChild(b);return b});a.appendChild(g);TASK.target=()=>next<k?btns[disp.indexOf(tg[next])]:null}}},
  calm(r,L,th){return{text:X('Breathe with the circle','Bernapas bersama lingkaran'),say:X('Let\'s calm our body. Breathe in when the circle grows. Breathe out when it gets small.','Ayo tenangkan tubuh kita. Tarik napas saat lingkaran membesar. Buang napas saat lingkaran mengecil.'),win:X('So calm and relaxed.','Tenang dan santai sekali.'),
    mount(a){const w=el('div','breathe-wrap','<div class="bcircle"></div>'),t=el('div','btext',X('Get ready…','Bersiap…')),c=el('div','left','');a.append(w,t,c);
     const circ=w.firstChild;let n=0,inh=false;
@@ -691,12 +691,13 @@ function praise(o){const pr=pick(Math.random,PRAISE),w=X(pr[0],pr[1]);
    ${o.tokens?`<div class="tokens lg" style="margin-top:12px">${o.tokens}</div><p class="soft">${o.left<=0?X('All stars! 🎁','Bintang penuh! 🎁'):X(`${o.left} more to go`,`Tinggal ${o.left} lagi`)}</p>`:''}
    <div class="btns"><button class="btn wide" data-o="next">${o.nextLabel||X('Next ▶','Lanjut ▶')}</button>${o.again?`<button class="btn alt wide" data-o="again">${X('🔁 Play again','🔁 Main lagi')}</button>`:''}</div>`);
   document.body.appendChild(ov);if(o.ch>0)sfx('up');else sfx('star');
-  if(o.win&&hasClip(o.win))speak(o.win,'praise',false,o.ch>0?()=>speak(X('Level up!','Naik level!'),'praise'):null);
+  const lvlUp=o.ch>0?()=>speak(X('Level up!','Naik level!'),'praise'):null;
+  if(o.win&&hasClip(o.win))speak(o.win,'praise',false,()=>speak(w,'praise',false,lvlUp));
   else speak(hasClip(w)?w:(o.win?o.win+' ':'')+w+(o.ch>0?X(' Level up!',' Naik level!'):''),'praise');
   burst(ov.querySelector('.st'));
   let gone=false;const go=f=>{if(gone)return;gone=true;f()};
   ov.querySelector('[data-o=next]').onclick=()=>go(o.onNext);const ag=ov.querySelector('[data-o=again]');if(ag)ag.onclick=()=>go(o.onAgain);
-  if(!o.again)setT(()=>go(o.onNext),2600)}
+  if(!o.again)setT(()=>go(o.onNext),o.win&&hasClip(o.win)?4800:2800)}
 
 function finishSession(){const s=S.session,P=S.progress,c=P.cur;const r={day:s.day,part:s.part,stars:s.plan.length,replay:s.replay,dayDone:false};
   if(!s.replay){if(!c.date)c.date=todayStr();c.parts[s.part]=1;c.tasks+=s.plan.length;c.m+=s.mistakes;c.breaks+=s.breaks;c.sec+=s.active;
